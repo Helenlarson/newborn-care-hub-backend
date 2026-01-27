@@ -8,9 +8,15 @@ from .views import (
 )
 
 urlpatterns = [
-    path("register/family", RegisterFamilyView.as_view()),
-    path("register/professional", RegisterProfessionalView.as_view()),
-    path("signup", SignupView.as_view()),
-    path("me", MeView.as_view()),
-    path("me/family", FamilyMeView.as_view()),
+    # legacy (mantidos)
+    path("register/family/", RegisterFamilyView.as_view()),
+    path("register/professional/", RegisterProfessionalView.as_view()),
+
+    # novos endpoints (frontend novo usa estes)
+    path("signup/", SignupView.as_view()),
+    path("me/", MeView.as_view()),
+    
+
+    # legacy family-only
+    path("me/family/", FamilyMeView.as_view()),
 ]
