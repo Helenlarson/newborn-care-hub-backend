@@ -1,7 +1,7 @@
-# Create your models here.
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from providers.models import ProfessionalProfile
+
 
 class Review(models.Model):
     professional = models.ForeignKey(
@@ -10,11 +10,11 @@ class Review(models.Model):
         related_name="reviews"
     )
     family_user = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="reviews_written"
     )
-    rating = models.PositiveSmallIntegerField()  # 1..5 (vamos validar no serializer)
+    rating = models.PositiveSmallIntegerField()
     comment = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -23,4 +23,3 @@ class Review(models.Model):
 
     def __str__(self):
         return f"Review {self.rating} for {self.professional_id}"
-
