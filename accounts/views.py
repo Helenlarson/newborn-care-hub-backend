@@ -1,77 +1,29 @@
-from rest_framework.views import APIView
+# accounts/views.py
+from django_filters.rest_framework import FilterSet, filters, DjangoFilterBackend
+from rest_framework import generics, permissions, status
+from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
-from rest_framework import status, permissions
+from rest_framework.views import APIView
+from rest_framework.exceptions import NotFound
 
+from .models import ProfessionalProfile, FamilyProfile, ServiceType
 from .serializers import (
-    FamilyRegisterSerializer,
-    ProfessionalRegisterSerializer,
     FamilyProfileMeSerializer,
     SignupSerializer,
     MeSerializer,
+    ProfessionalProfileListSerializer,
+    ProfessionalProfileMeUpdateSerializer,
+    ServiceTypeSerializer,
 )
 
-
 # ============================================================
-# LEGACY ENDPOINTS (mantidos para compatibilidade)
-# ============================================================
-
-class RegisterFamilyView(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request):
-        serializer = FamilyRegisterSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        return Response(
-            {
-                "message": "Family user created.",
-                "user": {
-                    "id": user.id,
-                    "email": user.email,
-                    "role": user.role,
-                },
-            },
-            status=status.HTTP_201_CREATED
-        )
-
-
-class RegisterProfessionalView(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request):
-        serializer = ProfessionalRegisterSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        return Response(
-            {
-                "message": "Professional user created.",
-                "user": {
-                    "id": user.id,
-                    "email": user.email,
-                    "role": user.role,
-                },
-            },
-            status=status.HTTP_201_CREATED
-        )
-
-
-# ============================================================
-# NOVO ENDPOINT UNIFICADO
 # POST /auth/signup
+# cria user + profile conforme role
 # ============================================================
-
 class SignupView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        """
-        Payload esperado:
-        {
-          "role": "family" | "provider",
-          "user": { "email": "...", "password": "..." },
-          "profile": { ... }
-        }
-        """
         serializer = SignupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
@@ -85,62 +37,105 @@ class SignupView(APIView):
                     "role": user.role,
                 },
             },
-            status=status.HTTP_201_CREATED
+            status=status.HTTP_201_CREATED,
         )
 
 
 # ============================================================
-# /auth/me (unificado)
+# /auth/me
 # GET / PATCH
 # ============================================================
-
 class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        serializer = MeSerializer(request.user)
-        return Response(serializer.data)
+        return Response(MeSerializer(request.user).data)
 
     def patch(self, request):
-        serializer = MeSerializer(
-            instance=request.user,
-            data=request.data,
-            partial=True
-        )
+        serializer = MeSerializer(instance=request.user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         return Response(MeSerializer(user).data)
 
 
 # ============================================================
-# ENDPOINT ANTIGO (family-only)
-# Mantido para não quebrar fluxos antigos
+# /family/me (legado)
+# GET / PATCH
 # ============================================================
-
 class FamilyMeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        if not hasattr(request.user, "family_profile"):
-            return Response(
-                {"detail": "Not a family user."},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        serializer = FamilyProfileMeSerializer(request.user.family_profile)
-        return Response(serializer.data)
+        if request.user.role != "family":
+            return Response({"detail": "Not a family user."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            profile = request.user.family_profile
+        except FamilyProfile.DoesNotExist:
+            raise NotFound("Family profile not found.")
+        return Response(FamilyProfileMeSerializer(profile).data)
 
     def patch(self, request):
-        if not hasattr(request.user, "family_profile"):
-            return Response(
-                {"detail": "Not a family user."},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        profile = request.user.family_profile
-        serializer = FamilyProfileMeSerializer(
-            profile,
-            data=request.data,
-            partial=True
-        )
+        if request.user.role != "family":
+            return Response({"detail": "Not a family user."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            profile = request.user.family_profile
+        except FamilyProfile.DoesNotExist:
+            raise NotFound("Family profile not found.")
+
+        serializer = FamilyProfileMeSerializer(profile, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+
+# ============================================================
+# Professionals listing + filters
+# Assumindo ProfessionalProfile.service_types = ["doula", "sleep-consultant", ...]
+# ============================================================
+class ProfessionalFilter(FilterSet):
+    city = filters.CharFilter(field_name="city", lookup_expr="icontains")
+    zipcode = filters.CharFilter(field_name="zipcode", lookup_expr="exact")
+    service_type = filters.CharFilter(method="filter_service_type")
+
+    def filter_service_type(self, qs, name, value):
+        # JSONField list: filtra se contém o slug informado
+        return qs.filter(service_types__contains=[value])
+
+    class Meta:
+        model = ProfessionalProfile
+        fields = ["city", "zipcode", "service_type"]
+
+
+class ProfessionalListView(generics.ListAPIView):
+    queryset = ProfessionalProfile.objects.all()
+    serializer_class = ProfessionalProfileListSerializer
+    permission_classes = [permissions.AllowAny]
+
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filterset_class = ProfessionalFilter
+    search_fields = ["display_name", "bio", "city", "state"]
+
+
+class ProfessionalDetailView(generics.RetrieveAPIView):
+    queryset = ProfessionalProfile.objects.all()
+    serializer_class = ProfessionalProfileListSerializer
+    permission_classes = [permissions.AllowAny]
+
+
+class ProfessionalMeView(generics.RetrieveUpdateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ProfessionalProfileMeUpdateSerializer
+
+    def get_object(self):
+        if self.request.user.role != "provider":
+            raise NotFound("Professional profile not available for this user.")
+        try:
+            return self.request.user.professional_profile
+        except ProfessionalProfile.DoesNotExist:
+            raise NotFound("Professional profile not found.")
+
+
+class ServiceTypeListView(generics.ListAPIView):
+    queryset = ServiceType.objects.all()
+    serializer_class = ServiceTypeSerializer
+    permission_classes = [permissions.AllowAny]

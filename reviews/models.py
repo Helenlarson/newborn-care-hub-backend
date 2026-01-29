@@ -1,11 +1,9 @@
 from django.db import models
 from django.conf import settings
-from providers.models import ProfessionalProfile
-
 
 class Review(models.Model):
     professional = models.ForeignKey(
-        ProfessionalProfile,
+        "accounts.ProfessionalProfile",
         on_delete=models.CASCADE,
         related_name="reviews"
     )

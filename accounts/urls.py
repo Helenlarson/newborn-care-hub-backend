@@ -1,22 +1,20 @@
+# accounts/urls.py
 from django.urls import path
 from .views import (
-    RegisterFamilyView,
-    RegisterProfessionalView,
-    SignupView,
-    MeView,
-    FamilyMeView,
+    SignupView, MeView, FamilyMeView,
+    ProfessionalListView, ProfessionalDetailView, ProfessionalMeView,
+    ServiceTypeListView,
 )
 
 urlpatterns = [
-    # legacy (mantidos)
-    path("register/family/", RegisterFamilyView.as_view()),
-    path("register/professional/", RegisterProfessionalView.as_view()),
+    path("auth/signup/", SignupView.as_view(), name="auth-signup"),
+    path("auth/me/", MeView.as_view(), name="auth-me"),
 
-    # novos endpoints (frontend novo usa estes)
-    path("signup/", SignupView.as_view()),
-    path("me/", MeView.as_view()),
-    
+    path("family/me/", FamilyMeView.as_view(), name="family-me"),
 
-    # legacy family-only
-    path("me/family/", FamilyMeView.as_view()),
+    path("professionals/", ProfessionalListView.as_view(), name="professionals-list"),
+    path("professionals/<int:pk>/", ProfessionalDetailView.as_view(), name="professionals-detail"),
+    path("professionals/me/", ProfessionalMeView.as_view(), name="professionals-me"),
+
+    path("service-types/", ServiceTypeListView.as_view(), name="service-types-list"),
 ]

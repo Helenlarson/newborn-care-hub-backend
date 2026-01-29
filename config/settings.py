@@ -23,8 +23,8 @@ load_dotenv(BASE_DIR / ".env")
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-secret")
-DEBUG = os.getenv("DEBUG", "False") == "True"
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
+DEBUG = "True"
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0", "192.168.0.10"]
 
 
 # Application definition
@@ -42,9 +42,9 @@ INSTALLED_APPS = [
     "corsheaders",
 
     "accounts",
-    "providers",
     "reviews",
     "messaging",
+    "django_extensions",
 ]
 
 REST_FRAMEWORK = {
@@ -137,7 +137,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "/static/"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 

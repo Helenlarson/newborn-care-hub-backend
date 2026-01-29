@@ -1,21 +1,30 @@
 from rest_framework import serializers
-from .models import Message
-from providers.models import ProfessionalProfile
+from .models import Conversation, Message
 
-class MessageCreateSerializer(serializers.ModelSerializer):
-    professional_id = serializers.IntegerField(write_only=True)
 
+class ContactCreateSerializer(serializers.Serializer):
+    professional_id = serializers.IntegerField()
+    message = serializers.CharField()
+
+
+class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
-        fields = ["professional_id", "family_name", "family_email", "family_city", "family_zipcode", "message", "created_at"]
-        read_only_fields = ["created_at"]
+        fields = ["id", "sender_role", "body", "created_at", "is_read"]
 
-    def create(self, validated_data):
-        professional_id = validated_data.pop("professional_id")
-        professional = ProfessionalProfile.objects.get(id=professional_id)
-        return Message.objects.create(professional=professional, **validated_data)
 
-class MessageListSerializer(serializers.ModelSerializer):
+class ConversationListSerializer(serializers.ModelSerializer):
+    last_message = serializers.SerializerMethodField()
+    last_message_at = serializers.SerializerMethodField()
+
     class Meta:
-        model = Message
-        fields = ["id", "family_name", "family_email", "family_city", "family_zipcode", "message", "created_at"]
+        model = Conversation
+        fields = ["id", "professional", "family_user", "updated_at", "last_message", "last_message_at"]
+
+    def get_last_message(self, obj):
+        m = obj.messages.last()
+        return m.body if m else None
+
+    def get_last_message_at(self, obj):
+        m = obj.messages.last()
+        return m.created_at if m else None

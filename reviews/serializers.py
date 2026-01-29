@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Review
-from providers.models import ProfessionalProfile
+from accounts.models import ProfessionalProfile
+
 
 class ReviewCreateSerializer(serializers.ModelSerializer):
     professional_id = serializers.IntegerField(write_only=True)
