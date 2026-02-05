@@ -63,11 +63,18 @@ class ProfessionalInboxView(ListAPIView):
     def get_queryset(self):
         if self.request.user.role != "provider":
             raise PermissionDenied("Only providers can access this inbox.")
+
         try:
             prof = self.request.user.professional_profile
         except ProfessionalProfile.DoesNotExist:
             raise NotFound("Professional profile not found.")
-        return Conversation.objects.filter(professional=prof).prefetch_related("messages")
+
+        return (
+            Conversation.objects
+            .filter(professional=prof)
+            .select_related("professional", "family_user", "family_user__family_profile")
+            .prefetch_related("messages")
+        )
 
 
 class FamilyInboxView(ListAPIView):
@@ -81,7 +88,13 @@ class FamilyInboxView(ListAPIView):
     def get_queryset(self):
         if self.request.user.role != "family":
             raise PermissionDenied("Only family users can access this inbox.")
-        return Conversation.objects.filter(family_user=self.request.user).prefetch_related("messages")
+
+        return (
+            Conversation.objects
+            .filter(family_user=self.request.user)
+            .select_related("professional", "family_user", "family_user__family_profile")
+            .prefetch_related("messages")
+        )
 
 
 class ConversationMessagesView(APIView):
@@ -93,12 +106,27 @@ class ConversationMessagesView(APIView):
 
     def get_conversation(self, conversation_id, user):
         try:
-            conv = Conversation.objects.select_related("professional", "family_user").get(id=conversation_id)
+            conv = (
+                Conversation.objects
+                .select_related(
+                    "professional",
+                    "professional__user",
+                    "family_user",
+                    "family_user__family_profile",
+                )
+                .get(id=conversation_id)
+            )
         except Conversation.DoesNotExist:
             raise NotFound("Conversation not found.")
 
-        is_provider = (user.role == "provider" and hasattr(user, "professional_profile")
-                       and conv.professional_id == user.professional_profile.id)
+        prof_profile_id = None
+        if user.role == "provider":
+            try:
+                prof_profile_id = user.professional_profile.id
+            except ProfessionalProfile.DoesNotExist:
+                prof_profile_id = None
+
+        is_provider = (user.role == "provider" and prof_profile_id and conv.professional_id == prof_profile_id)
         is_family = (user.role == "family" and conv.family_user_id == user.id)
 
         if not (is_provider or is_family):
@@ -108,13 +136,26 @@ class ConversationMessagesView(APIView):
 
     def get(self, request, conversation_id):
         conv = self.get_conversation(conversation_id, request.user)
-        msgs = conv.messages.all()
+
+        msgs = (
+            Message.objects
+            .filter(conversation=conv)
+            .select_related(
+                "conversation",
+                "conversation__professional",
+                "conversation__professional__user",
+                "conversation__family_user",
+                "conversation__family_user__family_profile",
+            )
+            .order_by("created_at")
+        )
+
         return Response(MessageSerializer(msgs, many=True).data)
 
     def post(self, request, conversation_id):
         conv = self.get_conversation(conversation_id, request.user)
 
-        text = request.data.get("message")
+        text = request.data.get("message") or request.data.get("body")
         if not text:
             return Response({"message": "This field is required."}, status=400)
 
@@ -126,7 +167,19 @@ class ConversationMessagesView(APIView):
             body=text
         )
 
-        # atualiza updated_at da conversa (já faz com auto_now ao salvar)
         conv.save(update_fields=["updated_at"])
+
+        # recarrega com select_related para o serializer ter acesso aos nomes sem query extra
+        msg = (
+            Message.objects
+            .select_related(
+                "conversation",
+                "conversation__professional",
+                "conversation__professional__user",
+                "conversation__family_user",
+                "conversation__family_user__family_profile",
+            )
+            .get(pk=msg.pk)
+        )
 
         return Response(MessageSerializer(msg).data, status=status.HTTP_201_CREATED)
