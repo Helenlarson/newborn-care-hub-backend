@@ -1,5 +1,8 @@
 # Newborn Care Hub — Backend
 
+**Ada Developers Academy — Cohort 24 Capstone Project**  
+Built by Helen Larson
+
 Backend API for **Newborn Care Hub**, a full-stack platform that connects families with newborn and postpartum care professionals.
 
 🔗 **Live API:**  
