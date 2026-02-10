@@ -18,7 +18,7 @@ https://newborn-care-hub-backend.onrender.com
 
 ---
 
-## Main Features
+## Main Features 
 - JWT-based user authentication
 - User roles: family & provider
 - Provider profiles with image upload
@@ -82,7 +82,3 @@ To run this project locally, follow the steps below:
 9. Open the API in your browser:
     http://localhost:8000
 
-
-
-   
-   git clone <backend-repository-url>
